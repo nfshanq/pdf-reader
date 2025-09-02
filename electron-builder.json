@@ -44,10 +44,6 @@
   "win": {
     "target": [
       {
-        "target": "nsis",
-        "arch": ["x64", "ia32"]
-      },
-      {
         "target": "portable",
         "arch": ["x64"]
       }
@@ -69,13 +65,7 @@
     "icon": "build/icons",
     "category": "Office"
   },
-  "nsis": {
-    "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
-    "createDesktopShortcut": true,
-    "createStartMenuShortcut": true,
-    "shortcutName": "PDF图像处理器"
-  },
+
   "publish": null,
   "buildVersion": "1.0.0"
 }

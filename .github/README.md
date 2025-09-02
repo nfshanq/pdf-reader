@@ -9,7 +9,7 @@ Automatically builds the Electron application for multiple platforms:
 
 #### Supported Platforms:
 - **macOS Apple Silicon (arm64)** - builds `.dmg` and `.zip` files
-- **Windows x64** - builds `.exe` and `.msi` installers
+- **Windows x64** - builds portable `.exe` executable
 
 #### Triggers:
 - Push to `main` branch
@@ -71,6 +71,5 @@ The build process requires:
 dist-electron/
 ├── PDF图像处理器-1.0.0-arm64.dmg    # macOS ARM64 installer
 ├── PDF图像处理器-1.0.0-arm64-mac.zip # macOS ARM64 app bundle
-├── PDF图像处理器 Setup 1.0.0.exe     # Windows installer
-└── PDF图像处理器 1.0.0.exe           # Windows portable
+└── PDF图像处理器 1.0.0.exe           # Windows portable executable
 ```

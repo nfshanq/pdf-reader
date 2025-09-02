@@ -6,7 +6,7 @@ This document explains how to build and release the PDF Image Processor Electron
 
 ### Supported Platforms
 - **macOS Apple Silicon (ARM64)** - `.dmg` and `.zip` packages
-- **Windows x64** - `.exe` installer and portable executable
+- **Windows x64** - portable `.exe` executable
 
 ### Automatic Builds
 The GitHub Actions workflow automatically builds the app when:
@@ -87,7 +87,6 @@ npm run dist:linux  # Linux only
 - `PDF图像处理器-1.0.0-arm64-mac.zip` - Application bundle
 
 ### Windows (x64)
-- `PDF图像处理器 Setup 1.0.0.exe` - NSIS installer
 - `PDF图像处理器 1.0.0.exe` - Portable executable
 
 ## Customization
