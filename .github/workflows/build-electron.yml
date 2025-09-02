@@ -1,5 +1,9 @@
 name: Build Electron App
 
+permissions:
+  contents: write # Allow creating releases
+  actions: read # Allow reading artifacts
+
 on:
   push:
     branches: [main]
@@ -48,13 +52,20 @@ jobs:
       - name: Build Electron app
         run: npm run electron:build
         env:
-          # Disable code signing
+          # Current: Disable code signing (uncomment below to enable)
           CSC_IDENTITY_AUTO_DISCOVERY: false
           CSC_LINK: ""
           CSC_KEY_PASSWORD: ""
-          # Skip notarization
           APPLE_ID: ""
           APPLE_ID_PASSWORD: ""
+          # Future: Enable code signing (uncomment when ready)
+          # CSC_IDENTITY_AUTO_DISCOVERY: true
+          # CSC_LINK: ${{ secrets.CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          # GitHub Token for electron-builder publishing
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts (macOS)
         if: matrix.os == 'macos-latest'
