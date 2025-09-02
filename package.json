@@ -20,7 +20,13 @@
     "lint": "echo 'Linting not configured yet'",
     "test": "echo 'Tests not configured yet'"
   },
-  "keywords": ["pdf", "image-processing", "sharp", "mupdf", "document-processing"],
+  "keywords": [
+    "pdf",
+    "image-processing",
+    "sharp",
+    "mupdf",
+    "document-processing"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -35,7 +41,9 @@
     "vite": "^7.1.4"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/multer": "^2.0.0",
     "@types/node": "^24.3.0",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
