@@ -1,5 +1,5 @@
 import * as mupdf from "mupdf";
-import { RenderOptions, PageBounds, ProgressCallback } from "@shared/types";
+import { RenderOptions, PageBounds, ProgressCallback } from "../shared/types.js";
 
 export class PageRenderer {
   
@@ -20,20 +20,19 @@ export class PageRenderer {
     try {
       const page = document.loadPage(pageIndex);
 
-      // 计算缩放比例 - 关键：保持原始页面尺寸，只改变像素密度
+      // 使用正确的 MuPDF.js Matrix API - 严格按照文档
       const scale = options.dpi / 72;
       const matrix = mupdf.Matrix.scale(scale, scale);
 
-      // 选择色彩空间
-      const colorSpace =
-        options.colorSpace === "Gray"
-          ? mupdf.ColorSpace.DeviceGray
-          : mupdf.ColorSpace.DeviceRGB;
+      // 使用正确的 ColorSpace API
+      const colorSpace = options.colorSpace === "Gray" 
+        ? mupdf.ColorSpace.DeviceGray 
+        : mupdf.ColorSpace.DeviceRGB;
 
       console.log(`Rendering page ${pageIndex}: ${bounds.width_pt} x ${bounds.height_pt} pt @ ${options.dpi} DPI`);
       console.log(`Pixel size: ${Math.floor(bounds.width_pt * scale)} x ${Math.floor(bounds.height_pt * scale)} px`);
 
-      // 渲染为位图
+      // 按照文档规范：toPixmap(matrix, colorSpace, alpha, showAnnotations)
       const pixmap = page.toPixmap(matrix, colorSpace, false, true);
 
       // 导出为指定格式

@@ -1,4 +1,4 @@
-import { ProcessedPage, ProgressCallback } from "@shared/types";
+import { ProcessedPage, ProgressCallback } from "../shared/types.js";
 import { PDFDocument as PDFLibDocument } from "pdf-lib";
 
 export class PDFExporter {

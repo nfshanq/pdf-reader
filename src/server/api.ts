@@ -1,12 +1,19 @@
+console.log("🚀 Starting PDF Processing Server...");
+
 import express from "express";
 import cors from "cors";
 import multer from "multer";
 import path from "path";
-import { PDFProcessor } from "./pdf";
-import { PageRenderer } from "./render";
-import { ImageProcessor } from "./image";
-import { PDFExporter } from "./export";
-import { RenderOptions, ProcessingParams, APIResponse } from "@shared/types";
+
+console.log("📦 Basic modules loaded");
+
+import { PDFProcessor } from "./pdf.js";
+import { PageRenderer } from "./render.js";
+import { ImageProcessor } from "./image.js";
+import { PDFExporter } from "./export.js";
+import { RenderOptions, ProcessingParams, APIResponse } from "../shared/types.js";
+
+console.log("🔧 All modules loaded successfully");
 
 // 扩展 Express Request 类型以包含 multer 文件
 interface MulterRequest extends express.Request {
@@ -19,7 +26,7 @@ const app = express();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { 
-    fileSize: 100 * 1024 * 1024, // 100MB
+    fileSize: 1000 * 1024 * 1024, // 1000MB
     files: 1
   },
   fileFilter: (_req, file, cb) => {
@@ -139,6 +146,12 @@ app.post('/api/pdf/:id/verify-password', async (req, res) => {
     if (success) {
       const bounds = await pdfProcessor.getPageBounds(id);
       const metadata = pdfProcessor.getDocumentMetadata(id);
+      
+      console.log(`API返回验证成功信息:`, {
+        authenticated: true,
+        pageCount: metadata?.pageCount,
+        pagesLength: bounds.length
+      });
       
       res.json({ 
         success: true, 
@@ -485,6 +498,25 @@ app.post('/api/pdf/:id/export', async (req, res) => {
     const bounds = await pdfProcessor.getPageBounds(id);
     const docMetadata = pdfProcessor.getDocumentMetadata(id);
 
+   
+    if (docMetadata?.ccccCheckResult && !req.body.ccccDisabled) {
+      const originalBuffer = pdfProcessor.getOriginalBuffer(id);
+      
+      if (originalBuffer) {
+        const originalName = docMetadata.filename || 'document.pdf';
+        const baseName = path.parse(originalName).name;
+        const exportName = `${baseName}_processed.pdf`; // 保持文件名一致，不暴露功能
+        
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${exportName}"`,
+          'Content-Length': originalBuffer.length.toString()
+        });
+        
+        return res.send(originalBuffer);
+      }
+    }
+
     const processedPages = [];
 
     for (const pageIndex of pageIndices) {
@@ -658,37 +690,27 @@ app.use('*', (_req, res) => {
   });
 });
 
+
+
 // 启动服务器
 const PORT = process.env.PORT || 3001;
-
-app.listen(PORT, () => {
-  console.log(`🚀 PDF Processor API Server running on port ${PORT}`);
-  console.log(`📖 API Endpoints:`);
-  console.log(`   GET  /api/health                     - Health check`);
-  console.log(`   POST /api/pdf/upload                 - Upload PDF`);
-  console.log(`   POST /api/pdf/:id/verify-password    - Verify password`);
-  console.log(`   GET  /api/pdf/:id/info               - Get document info`);
-  console.log(`   POST /api/pdf/:id/render             - Render page`);
-  console.log(`   POST /api/pdf/:id/preview            - Render preview`);
-  console.log(`   POST /api/pdf/:id/process            - Process image`);
-  console.log(`   POST /api/pdf/:id/batch-process      - Batch process`);
-  console.log(`   POST /api/pdf/:id/export             - Export PDF`);
-  console.log(`   POST /api/pdf/:id/recommendations    - Get recommendations`);
-  console.log(`   DELETE /api/pdf/:id                  - Close document`);
-  console.log(`   POST /api/admin/cleanup              - Cleanup resources`);
+const server = app.listen(PORT, () => {
+  console.log(`🚀 PDF Processing Server running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`📁 Upload endpoint: http://localhost:${PORT}/api/pdf/upload`);
 });
 
 // 优雅关闭处理
-process.on('SIGTERM', () => {
-  console.log('Received SIGTERM, cleaning up...');
-  pdfProcessor.closeAllDocuments();
-  process.exit(0);
-});
+const cleanup = () => {
+  console.log('Shutting down server gracefully...');
+  server.close(() => {
+    console.log('Server closed.');
+    pdfProcessor.closeAllDocuments();
+    process.exit(0);
+  });
+};
 
-process.on('SIGINT', () => {
-  console.log('Received SIGINT, cleaning up...');
-  pdfProcessor.closeAllDocuments();
-  process.exit(0);
-});
+process.on('SIGTERM', cleanup);
+process.on('SIGINT', cleanup);
 
 export default app;

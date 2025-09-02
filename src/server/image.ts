@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { ProcessingParams, ProgressCallback } from "@shared/types";
+import { ProcessingParams, ProgressCallback } from "../shared/types.js";
 
 export class ImageProcessor {
 
@@ -63,6 +63,19 @@ export class ImageProcessor {
           greyscale: params.grayscale,
         });
         console.log(`Applied threshold: ${params.threshold}`);
+      }
+
+      // 6. 颜色替换（如果启用）
+      if (params.colorReplace.enabled) {
+        console.log(`Applying color replacement: ${params.colorReplace.targetColor} -> ${params.colorReplace.replaceColor}, tolerance: ${params.colorReplace.tolerance}`);
+        const processedBuffer = await pipeline.png().toBuffer();
+        const colorReplacedBuffer = await this.replaceColor(
+          processedBuffer,
+          params.colorReplace.targetColor,
+          params.colorReplace.replaceColor,
+          params.colorReplace.tolerance
+        );
+        return colorReplacedBuffer;
       }
 
       // 输出为 PNG 格式（无损）
@@ -374,11 +387,103 @@ export class ImageProcessor {
       correctedParams.sharpen.sigma = Math.max(0, Math.min(10, correctedParams.sharpen.sigma));
     }
 
+    // 验证颜色替换参数
+    if (correctedParams.colorReplace.enabled) {
+      // 验证目标颜色
+      correctedParams.colorReplace.targetColor = correctedParams.colorReplace.targetColor.map(
+        value => Math.max(0, Math.min(255, Math.floor(value)))
+      ) as [number, number, number];
+
+      // 验证替换颜色
+      correctedParams.colorReplace.replaceColor = correctedParams.colorReplace.replaceColor.map(
+        value => Math.max(0, Math.min(255, Math.floor(value)))
+      ) as [number, number, number];
+
+      // 验证容差
+      if (correctedParams.colorReplace.tolerance < 0 || correctedParams.colorReplace.tolerance > 50) {
+        warnings.push(`Color tolerance ${correctedParams.colorReplace.tolerance} out of range [0, 50], clamped`);
+        correctedParams.colorReplace.tolerance = Math.max(0, Math.min(50, correctedParams.colorReplace.tolerance));
+      }
+    }
+
     return {
       valid: warnings.length === 0,
       correctedParams,
       warnings
     };
+  }
+
+  /**
+   * 颜色替换功能
+   * @param imageBuffer 输入图像 Buffer
+   * @param targetColor 目标颜色 RGB [r, g, b]
+   * @param replaceColor 替换颜色 RGB [r, g, b]
+   * @param tolerance 颜色容差
+   * @returns 处理后的图像 Buffer
+   */
+  async replaceColor(
+    imageBuffer: Buffer,
+    targetColor: [number, number, number],
+    replaceColor: [number, number, number],
+    tolerance: number
+  ): Promise<Buffer> {
+    try {
+      // 获取图像的原始像素数据
+      const { data, info } = await sharp(imageBuffer)
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      const { width, height, channels } = info;
+      const [targetR, targetG, targetB] = targetColor;
+      const [replaceR, replaceG, replaceB] = replaceColor;
+
+      console.log(`Processing ${width}x${height} image with ${channels} channels`);
+      console.log(`Target color: RGB(${targetR}, ${targetG}, ${targetB}), tolerance: ±${tolerance}`);
+      console.log(`Replace with: RGB(${replaceR}, ${replaceG}, ${replaceB})`);
+
+      let replacedPixels = 0;
+
+      // 遍历每个像素
+      for (let i = 0; i < data.length; i += channels) {
+        const pixelR = data[i];
+        const pixelG = data[i + 1];
+        const pixelB = data[i + 2];
+
+        // 检查是否在目标颜色的容差范围内
+        const diffR = Math.abs(pixelR - targetR);
+        const diffG = Math.abs(pixelG - targetG);
+        const diffB = Math.abs(pixelB - targetB);
+
+        if (diffR <= tolerance && diffG <= tolerance && diffB <= tolerance) {
+          // 替换颜色
+          data[i] = replaceR;     // R
+          data[i + 1] = replaceG; // G
+          data[i + 2] = replaceB; // B
+          // Alpha 通道保持不变 (如果存在)
+          replacedPixels++;
+        }
+      }
+
+      console.log(`Replaced ${replacedPixels} pixels`);
+
+      // 重新构建图像
+      const result = await sharp(data, {
+        raw: {
+          width,
+          height,
+          channels
+        }
+      })
+      .png()
+      .toBuffer();
+
+      return result;
+
+    } catch (error) {
+      console.error("Failed to replace color:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to replace color: ${message}`);
+    }
   }
 
   /**

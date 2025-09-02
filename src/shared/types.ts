@@ -26,6 +26,12 @@ export interface ProcessingParams {
   };
   denoise: boolean;
   gamma: number; // 0.1-3.0
+  colorReplace: {
+    enabled: boolean;
+    targetColor: [number, number, number]; // RGB 目标颜色
+    replaceColor: [number, number, number]; // RGB 替换颜色
+    tolerance: number; // 颜色容差 0-50
+  };
 }
 
 export interface ProcessedPage {
@@ -44,6 +50,7 @@ export interface PDFDocument {
   needsPassword: boolean;
   isAuthenticated: boolean;
   pages: PageBounds[];
+  ccccCheckResult?: boolean; // 特殊内容检查结果
 }
 
 // API 响应类型

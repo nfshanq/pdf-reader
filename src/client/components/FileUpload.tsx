@@ -11,6 +11,7 @@ export function FileUpload({ onFileUpload, isLoading, error }: FileUploadProps) 
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [password, setPassword] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -61,10 +62,24 @@ export function FileUpload({ onFileUpload, isLoading, error }: FileUploadProps) 
 
   const handleUpload = useCallback(async (file: File, pwd?: string) => {
     try {
+      setPasswordError(null);
       await onFileUpload(file, pwd);
+      // 上传成功，关闭密码输入框
+      setShowPasswordInput(false);
+      setPassword('');
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Password required')) {
+      if (error instanceof Error && (
+        error.message.includes('Password required') || 
+        error.message.includes('Invalid password')
+      )) {
         setShowPasswordInput(true);
+        if (error.message.includes('Invalid password')) {
+          // 密码错误，清空输入框让用户重新输入
+          setPassword('');
+          setPasswordError('密码错误，请重新输入');
+        } else {
+          setPasswordError(null);
+        }
       }
     }
   }, [onFileUpload]);
@@ -133,7 +148,10 @@ export function FileUpload({ onFileUpload, isLoading, error }: FileUploadProps) 
                 <input
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError(null);
+                  }}
                   placeholder="请输入密码"
                   autoFocus
                   className="password-input"
@@ -146,9 +164,19 @@ export function FileUpload({ onFileUpload, isLoading, error }: FileUploadProps) 
                   {isLoading ? '验证中...' : '确认'}
                 </button>
               </div>
+              {passwordError && (
+                <div className="password-error">
+                  <span className="error-icon">⚠️</span>
+                  {passwordError}
+                </div>
+              )}
             </form>
             <button 
-              onClick={() => setShowPasswordInput(false)}
+              onClick={() => {
+                setShowPasswordInput(false);
+                setPassword('');
+                setPasswordError(null);
+              }}
               className="password-cancel"
             >
               取消

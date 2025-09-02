@@ -3,6 +3,7 @@ import { PDFDocument, RenderOptions, ProcessingParams } from '@shared/types';
 
 interface ExportDialogProps {
   pdfDocument: PDFDocument;
+  currentPage: number;
   renderOptions: RenderOptions;
   processingParams: ProcessingParams;
   onExport?: (options: ExportOptions) => Promise<void>;
@@ -21,7 +22,8 @@ interface ExportOptions {
 }
 
 export function ExportDialog({ 
-  pdfDocument, 
+  pdfDocument,
+  currentPage,
   renderOptions, 
   processingParams, 
   onExport,
@@ -41,7 +43,7 @@ export function ExportDialog({
   const getSelectedPageIndices = useCallback((): number[] => {
     switch (exportMode) {
       case 'current':
-        return [0]; // 这里应该是当前页面，但组件没有接收 currentPage prop
+        return [currentPage];
       case 'all':
         return Array.from({ length: pdfDocument.pageCount }, (_, i) => i);
       case 'range':
@@ -51,7 +53,7 @@ export function ExportDialog({
       default:
         return [];
     }
-  }, [exportMode, pageRange, pdfDocument.pageCount]);
+  }, [exportMode, pageRange, pdfDocument.pageCount, currentPage]);
 
   // 估算文件大小
   const estimateFileSize = useCallback(() => {

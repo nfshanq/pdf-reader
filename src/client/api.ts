@@ -240,7 +240,8 @@ class APIClient {
       title?: string;
       author?: string;
       subject?: string;
-    }
+    },
+    ccccDisabled?: boolean
   ): Promise<Blob> {
     try {
       const response = await fetch(`${this.baseURL}/pdf/${documentId}/export`, {
@@ -252,7 +253,8 @@ class APIClient {
           pageIndices, 
           renderOptions, 
           processingParams,
-          metadata 
+          metadata,
+          ccccDisabled
         }),
       });
 

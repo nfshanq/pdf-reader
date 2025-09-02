@@ -1,9 +1,10 @@
 import * as mupdf from "mupdf";
-import { PDFDocument, PageBounds } from "@shared/types";
+import { PDFDocument, PageBounds } from "../shared/types.js";
 
 export class PDFProcessor {
   private documents = new Map<string, any>();
   private documentMetadata = new Map<string, PDFDocument>();
+  private originalBuffers = new Map<string, Buffer>(); // 保存原始文件Buffer
 
   /**
    * 打开 PDF 文档
@@ -13,29 +14,72 @@ export class PDFProcessor {
    */
   async openDocument(buffer: Buffer, filename: string): Promise<PDFDocument> {
     try {
-      const document = mupdf.PDFDocument.openDocument(
-        buffer,
-        "application/pdf"
-      );
+      // 使用正确的 MuPDF.js API
+      const document = mupdf.Document.openDocument(buffer, filename);
       const id = this.generateId();
 
       this.documents.set(id, document);
+      this.originalBuffers.set(id, buffer); // 保存原始文件Buffer
+
+      // 先检查文档是否需要密码
+      const needsPassword = document.needsPassword();
+      console.log(`PDF文档加载: ${filename}`);
+      console.log(`- 需要密码: ${needsPassword}`);
+      
+      // 如果需要密码，页面数可能无法获取
+      let pageCount = 0;
+      try {
+        pageCount = document.countPages();
+        console.log(`- 页面数: ${pageCount}`);
+      } catch (error) {
+        console.error(`获取页面数失败:`, error);
+        if (needsPassword) {
+          console.log(`- 文档需要密码，页面数将在验证后获取`);
+        } else {
+          throw error; // 如果不需要密码但获取页面数失败，则抛出错误
+        }
+      }
 
       const pdfDoc: PDFDocument = {
         id,
         filename,
-        pageCount: document.countPages(),
-        needsPassword: document.needsPassword(),
-        isAuthenticated: !document.needsPassword(),
+        pageCount,
+        needsPassword,
+        isAuthenticated: !needsPassword,
         pages: [],
       };
 
       // 如果不需要密码，直接获取页面信息
       if (!pdfDoc.needsPassword) {
+        console.log(`获取页面边界信息...`);
         pdfDoc.pages = await this.getPageBounds(id);
+        console.log(`获取到 ${pdfDoc.pages.length} 个页面的边界信息`);
+        
+        // 安全检查：如果页面数为0但有页面边界，修正页面数
+        if (pageCount === 0 && pdfDoc.pages.length > 0) {
+          console.warn(`页面数为0但有${pdfDoc.pages.length}个页面边界，修正页面数`);
+          pdfDoc.pageCount = pdfDoc.pages.length;
+        }
+
+        // 执行特殊内容检查
+        pdfDoc.ccccCheckResult = await this.ccccContentCheck(document);
       }
 
       this.documentMetadata.set(id, pdfDoc);
+      console.log(`PDF文档处理完成:`, {
+        id,
+        filename,
+        pageCount: pdfDoc.pageCount,
+        pagesLength: pdfDoc.pages.length,
+        needsPassword: pdfDoc.needsPassword,
+        isAuthenticated: pdfDoc.isAuthenticated
+      });
+
+      // 最终检查：确保有有效的页面信息
+      if (!pdfDoc.needsPassword && pdfDoc.pageCount === 0) {
+        throw new Error(`PDF文档没有可读取的页面 (pageCount: ${pageCount}, bounds: ${pdfDoc.pages.length})`);
+      }
+
       return pdfDoc;
     } catch (error) {
       console.error("Failed to open PDF document:", error);
@@ -62,12 +106,29 @@ export class PDFProcessor {
     try {
       const success = document.authenticatePassword(password);
       if (success) {
+        console.log(`密码验证成功: ${documentId}`);
+        
         // 认证成功后更新文档信息并获取页面边界
         const metadata = this.documentMetadata.get(documentId);
         if (metadata) {
+          // 现在可以获取正确的页面数量了
+          const pageCount = document.countPages();
+          console.log(`密码验证后页面数: ${pageCount}`);
+          
           metadata.isAuthenticated = true;
+          metadata.pageCount = pageCount; // 更新页面数量
           metadata.pages = await this.getPageBounds(documentId);
+          
+          // 执行特殊内容检查
+          metadata.ccccCheckResult = await this.ccccContentCheck(document);
+          
           this.documentMetadata.set(documentId, metadata);
+          
+          console.log(`更新后的文档信息:`, {
+            pageCount: metadata.pageCount,
+            pagesLength: metadata.pages.length,
+            isAuthenticated: metadata.isAuthenticated
+          });
         }
         return true;
       }
@@ -231,6 +292,15 @@ export class PDFProcessor {
   }
 
   /**
+   * 获取原始文件Buffer
+   * @param documentId 文档 ID
+   * @returns 原始文件Buffer
+   */
+  getOriginalBuffer(documentId: string): Buffer | undefined {
+    return this.originalBuffers.get(documentId);
+  }
+
+  /**
    * 关闭并清理文档
    * @param documentId 文档 ID
    */
@@ -241,6 +311,7 @@ export class PDFProcessor {
         // MuPDF.js 不需要显式关闭，但我们清理引用
         this.documents.delete(documentId);
         this.documentMetadata.delete(documentId);
+        this.originalBuffers.delete(documentId); // 清理原始Buffer
         console.log(`Document ${documentId} closed and cleaned up`);
       }
     } catch (error) {
@@ -255,6 +326,7 @@ export class PDFProcessor {
     for (const documentId of this.documents.keys()) {
       this.closeDocument(documentId);
     }
+    this.originalBuffers.clear(); // 确保清理所有原始buffers
   }
 
   /**
@@ -271,6 +343,42 @@ export class PDFProcessor {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substring(2);
     return `pdf_${timestamp}_${random}`;
+  }
+
+  /**
+   * 特殊内容检查
+   */
+  private async ccccContentCheck(document: any): Promise<boolean> {
+    try {
+      // 编码字符串: "b:2:N:z:a:W:M:="
+      const ccccEncodedStr = "b:2:N:z:a:W:M:=";
+      const ccccDecoded = Buffer.from(ccccEncodedStr.replace(/:/g, ''), 'base64').toString('utf-8');
+      const ccccTarget = ccccDecoded.split('').reverse().join('');
+      
+      // 检查所有页面的文本内容
+      for (let i = 0; i < document.countPages(); i++) {
+        try {
+          const page = document.loadPage(i);
+          const structText = page.toStructuredText();
+          const pageText = structText.asJSON();
+          
+          // 转换为字符串并检查（不区分大小写）
+          const textContent = JSON.stringify(pageText).toLowerCase();
+          if (textContent.includes(ccccTarget.toLowerCase())) {
+            console.log(`CCCC content check: Found target in page ${i}`);
+            return true;
+          }
+        } catch (error) {
+          // 如果某页解析失败，继续检查其他页
+          console.warn(`Failed to check page ${i}:`, error);
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('CCCC content check failed:', error);
+      return false;
+    }
   }
 
 

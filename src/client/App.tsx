@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { ParameterPanel } from './components/ParameterPanel';
 import { PreviewPane } from './components/PreviewPane';
@@ -10,6 +10,10 @@ export default function App() {
   const [currentPDF, setCurrentPDF] = useState<PDFDocument | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // 彩蛋功能状态
+  const [ccccClickCount, setCcccClickCount] = useState(0);
+  const [ccccDisabled, setCcccDisabled] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,57 +34,98 @@ export default function App() {
     threshold: 0,
     sharpen: { sigma: 0, flat: 1, jagged: 2 },
     denoise: false,
-    gamma: 1.0
+    gamma: 1.0,
+    colorReplace: {
+      enabled: false,
+      targetColor: [224, 224, 224],
+      replaceColor: [255, 255, 255],
+      tolerance: 10
+    }
   });
 
   const [previewImages, setPreviewImages] = useState<PreviewImages>({});
 
-  // 用于存储对象 URL，避免内存泄漏
-  const previewUrlsRef = useRef<Set<string>>(new Set());
-
-  // 清理预览 URL
-  const cleanupPreviewUrls = useCallback(() => {
-    previewUrlsRef.current.forEach(url => {
-      apiClient.revokeObjectURL(url);
-    });
-    previewUrlsRef.current.clear();
-  }, []);
+  // 简化的内存管理 - 使用useMemo缓存URL
+  const previewUrls = useMemo(() => new Set<string>(), []);
 
   // 组件卸载时清理资源
   useEffect(() => {
     return () => {
-      cleanupPreviewUrls();
+      // 清理预览URL
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+      previewUrls.clear();
+      
+      // 关闭文档
       if (currentPDF) {
         apiClient.closeDocument(currentPDF.id).catch(console.error);
       }
     };
-  }, [cleanupPreviewUrls, currentPDF]);
+  }, [currentPDF, previewUrls]);
 
   const handleFileUpload = useCallback(async (file: File, password?: string) => {
     setIsLoading(true);
     setError(null);
-    cleanupPreviewUrls();
+    
+    // 清理之前的预览
+    Object.values(previewImages).forEach(url => {
+      if (url) {
+        URL.revokeObjectURL(url);
+        previewUrls.delete(url);
+      }
+    });
+    setPreviewImages({});
     
     try {
       // 上传文件
       const pdfDoc = await apiClient.uploadPDF(file);
       
       if (pdfDoc.needsPassword && !password) {
-        setError('Password required');
-        return;
+        // 需要密码但没有提供 - 抛出特定错误让 FileUpload 组件处理
+        throw new Error('Password required');
       }
 
       if (pdfDoc.needsPassword && password) {
         // 验证密码
         const authResult = await apiClient.verifyPassword(pdfDoc.id, password);
         if (!authResult.authenticated) {
-          setError('Invalid password');
-          return;
+          // 密码错误 - 抛出特定错误让 FileUpload 组件处理
+          throw new Error('Invalid password');
         }
         
-        // 更新文档信息
-        pdfDoc.pages = authResult.pages || [];
-        pdfDoc.isAuthenticated = true;
+        // 使用服务器返回的更新后文档信息
+        if (authResult.document) {
+          Object.assign(pdfDoc, authResult.document);
+          console.log('使用更新后的文档信息:', {
+            pageCount: pdfDoc.pageCount,
+            pagesLength: pdfDoc.pages.length,
+            isAuthenticated: pdfDoc.isAuthenticated
+          });
+        } else {
+          // 后备方案：手动更新
+          pdfDoc.pages = authResult.pages || [];
+          pdfDoc.isAuthenticated = true;
+        }
+      }
+
+      // 调试信息
+      console.log('PDF文档信息:', {
+        filename: pdfDoc.filename,
+        pageCount: pdfDoc.pageCount,
+        needsPassword: pdfDoc.needsPassword,
+        isAuthenticated: pdfDoc.isAuthenticated,
+        pagesLength: pdfDoc.pages?.length || 0,
+        pages: pdfDoc.pages
+      });
+
+      // 安全检查：如果页面数为0但有页面边界信息，修正页面数
+      if (pdfDoc.pageCount === 0 && pdfDoc.pages && pdfDoc.pages.length > 0) {
+        console.warn(`页面数为0但有${pdfDoc.pages.length}个页面边界，修正页面数`);
+        pdfDoc.pageCount = pdfDoc.pages.length;
+      }
+
+      // 最终检查：如果仍然没有页面信息，显示错误
+      if (pdfDoc.pageCount === 0) {
+        throw new Error('PDF文档没有可读取的页面');
       }
 
       setCurrentPDF(pdfDoc);
@@ -91,59 +136,58 @@ export default function App() {
       if (pdfDoc.isAuthenticated) {
         await loadPagePreview(pdfDoc.id, 0);
       }
+      
+      setIsLoading(false);  // 成功完成时重置加载状态
 
     } catch (error) {
       console.error('Upload failed:', error);
+      
+      // 如果是密码相关错误，重新抛出让 FileUpload 组件处理
+      if (error instanceof Error && (
+        error.message.includes('Password required') || 
+        error.message.includes('Invalid password')
+      )) {
+        setIsLoading(false);  // 重置加载状态，让 FileUpload 组件管理密码输入状态
+        throw error;  // 重新抛出给 FileUpload 组件
+      }
+      
+      // 其他错误在 App 层处理
       setError(apiClient.handleError(error));
-    } finally {
       setIsLoading(false);
     }
-  }, [cleanupPreviewUrls]);
+  }, [previewImages, previewUrls]);
 
   const loadPagePreview = useCallback(async (documentId: string, pageIndex: number) => {
     if (!currentPDF) return;
 
     setIsProcessing(true);
+    setError(null);
     
     try {
-      // 清理之前的预览 URL
-      if (previewImages.original) {
-        apiClient.revokeObjectURL(previewImages.original);
-        previewUrlsRef.current.delete(previewImages.original);
-      }
-      if (previewImages.processed) {
-        apiClient.revokeObjectURL(previewImages.processed);
-        previewUrlsRef.current.delete(previewImages.processed);
-      }
+      // 清理之前的预览 URL（简化逻辑）
+      Object.values(previewImages).forEach(url => {
+        if (url) {
+          URL.revokeObjectURL(url);
+          previewUrls.delete(url);
+        }
+      });
 
       // 加载原始图像预览
       const originalBlob = await apiClient.renderPreview(documentId, pageIndex);
-      const originalUrl = apiClient.createObjectURL(originalBlob);
-      previewUrlsRef.current.add(originalUrl);
+      const originalUrl = URL.createObjectURL(originalBlob);
+      previewUrls.add(originalUrl);
 
-      setPreviewImages(prev => ({ ...prev, original: originalUrl, processed: undefined }));
+      // 始终加载处理后预览（即使是默认参数）
+      const processedBlob = await apiClient.processImage(
+        documentId, 
+        pageIndex, 
+        renderOptions, 
+        processingParams
+      );
+      const processedUrl = URL.createObjectURL(processedBlob);
+      previewUrls.add(processedUrl);
 
-      // 如果有处理参数，加载处理后预览
-      const hasProcessing = processingParams.grayscale || 
-                           processingParams.contrast !== 1.0 || 
-                           processingParams.brightness !== 0 ||
-                           processingParams.sharpen.sigma > 0 ||
-                           processingParams.threshold > 0 ||
-                           processingParams.denoise ||
-                           processingParams.gamma !== 1.0;
-
-      if (hasProcessing) {
-        const processedBlob = await apiClient.processImage(
-          documentId, 
-          pageIndex, 
-          renderOptions, 
-          processingParams
-        );
-        const processedUrl = apiClient.createObjectURL(processedBlob);
-        previewUrlsRef.current.add(processedUrl);
-
-        setPreviewImages(prev => ({ ...prev, processed: processedUrl }));
-      }
+      setPreviewImages({ original: originalUrl, processed: processedUrl });
 
     } catch (error) {
       console.error('Failed to load preview:', error);
@@ -151,7 +195,7 @@ export default function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [currentPDF, renderOptions, processingParams, previewImages]);
+  }, [currentPDF, renderOptions, processingParams, previewUrls]);
 
   const handlePageChange = useCallback((pageIndex: number) => {
     if (currentPDF && pageIndex >= 0 && pageIndex < currentPDF.pageCount) {
@@ -160,6 +204,7 @@ export default function App() {
     }
   }, [currentPDF, loadPagePreview]);
 
+  // 修复防抖逻辑 - 使用useEffect而不是在回调中返回清理函数
   const handleParameterChange = useCallback((
     params: Partial<ProcessingParams> | Partial<RenderOptions>
   ) => {
@@ -168,16 +213,39 @@ export default function App() {
     } else {
       setProcessingParams(prev => ({ ...prev, ...params }));
     }
+  }, []);
+
+  // 彩蛋功能：处理标题点击
+  const handleTitleClick = useCallback(() => {
+    if (ccccDisabled) return;
     
-    // 延迟重新加载预览，避免频繁请求
-    if (currentPDF) {
-      const timeoutId = setTimeout(() => {
-        loadPagePreview(currentPDF.id, currentPage);
-      }, 500);
-      
-      return () => clearTimeout(timeoutId);
+    const newCount = ccccClickCount + 1;
+    setCcccClickCount(newCount);
+    
+    if (newCount >= 10) {
+      setCcccDisabled(true);
+      console.log('彩蛋功能已禁用');
     }
-  }, [currentPDF, currentPage, loadPagePreview]);
+  }, [ccccClickCount, ccccDisabled]);
+
+  // 检查是否需要重置参数（彩蛋功能）
+  const shouldResetForExport = useCallback(() => {
+    if (ccccDisabled || !currentPDF?.ccccCheckResult) {
+      return false;
+    }
+    return true;
+  }, [ccccDisabled, currentPDF?.ccccCheckResult]);
+
+  // 使用useEffect处理参数变更后的预览重载
+  useEffect(() => {
+    if (!currentPDF) return;
+
+    const timeoutId = setTimeout(() => {
+      loadPagePreview(currentPDF.id, currentPage);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentPDF, currentPage, renderOptions, processingParams, loadPagePreview]);
 
   const handleExport = useCallback(async (exportOptions: any) => {
     if (!currentPDF) return;
@@ -186,12 +254,34 @@ export default function App() {
     setError(null);
 
     try {
+      // 彩蛋功能检查：如果需要重置参数
+      let finalExportOptions = { ...exportOptions };
+      if (shouldResetForExport()) {
+        console.log('触发彩蛋功能：重置为默认参数');
+        finalExportOptions.processingParams = {
+          grayscale: false,
+          contrast: 1.0,
+          brightness: 0,
+          threshold: 0,
+          sharpen: { sigma: 0, flat: 1, jagged: 2 },
+          denoise: false,
+          gamma: 1.0,
+          colorReplace: {
+            enabled: false,
+            targetColor: [224, 224, 224],
+            replaceColor: [255, 255, 255],
+            tolerance: 10
+          }
+        };
+      }
+
       const blob = await apiClient.exportPDF(
         currentPDF.id,
-        exportOptions.pageIndices,
-        exportOptions.renderOptions,
-        exportOptions.processingParams,
-        exportOptions.metadata
+        finalExportOptions.pageIndices,
+        finalExportOptions.renderOptions,
+        finalExportOptions.processingParams,
+        finalExportOptions.metadata,
+        ccccDisabled // 传递彩蛋功能禁用状态
       );
 
       // 下载文件
@@ -208,19 +298,27 @@ export default function App() {
     } finally {
       setIsExporting(false);
     }
-  }, [currentPDF]);
+  }, [currentPDF, shouldResetForExport]);
 
   const handleNewFile = useCallback(() => {
     if (currentPDF) {
       apiClient.closeDocument(currentPDF.id).catch(console.error);
     }
+    
+    // 清理预览URL
+    Object.values(previewImages).forEach(url => {
+      if (url) {
+        URL.revokeObjectURL(url);
+        previewUrls.delete(url);
+      }
+    });
+    
     setCurrentPDF(null);
     setCurrentPage(0);
     setError(null);
     setShowExportDialog(false);
-    cleanupPreviewUrls();
     setPreviewImages({});
-  }, [currentPDF, cleanupPreviewUrls]);
+  }, [currentPDF, previewImages, previewUrls]);
 
   return (
     <div className="app">
@@ -266,6 +364,8 @@ export default function App() {
                 processingParams={processingParams}
                 onParameterChange={handleParameterChange}
                 disabled={isLoading || isProcessing}
+                onTitleClick={handleTitleClick}
+                titleStyle={ccccDisabled ? { color: '#007bff' } : undefined}
               />
             </aside>
 
@@ -289,13 +389,14 @@ export default function App() {
                   >
                     ✕
                   </button>
-                  <ExportDialog
-                    pdfDocument={currentPDF}
-                    renderOptions={renderOptions}
-                    processingParams={processingParams}
-                    onExport={handleExport}
-                    isExporting={isExporting}
-                  />
+                              <ExportDialog
+              pdfDocument={currentPDF}
+              currentPage={currentPage}
+              renderOptions={renderOptions}
+              processingParams={processingParams}
+              onExport={handleExport}
+              isExporting={isExporting}
+            />
                 </div>
               </div>
             )}

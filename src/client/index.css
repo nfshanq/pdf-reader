@@ -19,6 +19,104 @@ body {
   flex-direction: column;
 }
 
+/* 密码错误提示样式 */
+.password-error {
+  color: #e74c3c;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.password-error .error-icon {
+  font-size: 1rem;
+}
+
+/* 颜色替换功能样式 */
+.color-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.color-input {
+  width: 60px;
+  padding: 0.25rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.color-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.color-preview {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* 可折叠参数组样式 */
+.section-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  background: none;
+  border: none;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  text-align: left;
+  border-bottom: 1px solid #e5e5e5;
+  margin-bottom: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.section-header:hover {
+  color: #667eea;
+}
+
+.section-header:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.collapse-icon {
+  font-size: 0.875rem;
+  transition: transform 0.2s ease;
+  color: #666;
+}
+
+.collapse-icon.collapsed {
+  transform: rotate(0deg);
+}
+
+.collapse-icon.expanded {
+  transform: rotate(90deg);
+}
+
+/* 可点击标题样式 */
+.clickable-title {
+  cursor: pointer;
+  transition: color 0.2s ease;
+  user-select: none;
+}
+
+.clickable-title:hover {
+  opacity: 0.8;
+}
+
 .app-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
