@@ -48,11 +48,13 @@ jobs:
       - name: Build Electron app
         run: npm run electron:build
         env:
-          # macOS code signing (optional - add your certificates)
+          # Disable code signing
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          # Windows code signing (optional)
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_LINK: ""
+          CSC_KEY_PASSWORD: ""
+          # Skip notarization
+          APPLE_ID: ""
+          APPLE_ID_PASSWORD: ""
 
       - name: Upload artifacts (macOS)
         if: matrix.os == 'macos-latest'
