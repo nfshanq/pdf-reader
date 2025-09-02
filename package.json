@@ -4,11 +4,6 @@
   "description": "PDF image processing tool with rendering, image enhancement, and export capabilities",
   "main": "dist/main/main.js",
   "type": "module",
-  "directories": {
-    "doc": "docs",
-    "example": "examples",
-    "test": "test"
-  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -72,5 +67,39 @@
   "engines": {
     "node": ">=22.0.0",
     "npm": ">=9.0.0"
+  },
+  "build": {
+    "appId": "com.pdfprocessor.app",
+    "productName": "PDF图像处理器",
+    "copyright": "Copyright © 2024",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        },
+        {
+          "target": "zip", 
+          "arch": ["arm64"]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    }
   }
 }
