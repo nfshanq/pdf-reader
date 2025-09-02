@@ -34,8 +34,13 @@ jobs:
           node-version: "22"
           cache: "npm"
 
-      - name: Install dependencies
+      - name: Install dependencies (Unix)
+        if: runner.os != 'Windows'
         run: npm ci
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: npm ci --no-audit --prefer-offline --force
 
       - name: Build web assets
         run: npm run build

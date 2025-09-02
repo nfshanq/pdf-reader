@@ -2,8 +2,7 @@
   "appId": "com.pdfprocessor.app",
   "productName": "PDF图像处理器",
   "copyright": "Copyright © 2024",
-  "buildResources": "build",
-  "output": "dist-electron",
+  "artifactName": "${productName}-${version}-${arch}.${ext}",
   "files": [
     "dist/**/*",
     "node_modules/**/*"
@@ -14,19 +13,13 @@
     "target": [
       {
         "target": "dmg",
-        "arch": ["x64", "arm64"]
+        "arch": ["arm64"]
       },
       {
-        "target": "zip",
-        "arch": ["x64", "arm64"]
+        "target": "zip", 
+        "arch": ["arm64"]
       }
-    ],
-    "icon": "build/icon.icns",
-    "entitlements": "build/entitlements.mac.plist",
-    "entitlementsInherit": "build/entitlements.mac.plist",
-    "gatekeeperAssess": false,
-    "hardenedRuntime": true,
-    "notarize": false
+    ]
   },
   "win": {
     "target": [
@@ -34,23 +27,6 @@
         "target": "portable",
         "arch": ["x64"]
       }
-    ],
-    "icon": "build/icon.ico",
-    "publisherName": "PDF处理器"
-  },
-  "linux": {
-    "target": [
-      {
-        "target": "AppImage",
-        "arch": ["x64"]
-      },
-      {
-        "target": "deb",
-        "arch": ["x64"]
-      }
-    ],
-    "icon": "build/icons",
-    "category": "Office"
-  },
-  "publish": null
+    ]
+  }
 }

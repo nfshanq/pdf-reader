@@ -82,6 +82,6 @@ The build process requires:
 ```
 dist-electron/
 ├── PDF图像处理器-1.0.0-arm64.dmg    # macOS ARM64 installer
-├── PDF图像处理器-1.0.0-arm64-mac.zip # macOS ARM64 app bundle
-└── PDF图像处理器 1.0.0.exe           # Windows portable executable
+├── PDF图像处理器-1.0.0-arm64.zip    # macOS ARM64 app bundle
+└── PDF图像处理器-1.0.0-x64.exe       # Windows portable executable
 ```
