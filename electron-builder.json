@@ -2,26 +2,13 @@
   "appId": "com.pdfprocessor.app",
   "productName": "PDF图像处理器",
   "copyright": "Copyright © 2024",
-  "directories": {
-    "buildResources": "build",
-    "output": "dist-electron"
-  },
+  "buildResources": "build",
+  "output": "dist-electron",
   "files": [
     "dist/**/*",
-    "node_modules/**/*",
-    {
-      "from": "dist",
-      "to": ".",
-      "filter": ["**/*"]
-    }
+    "node_modules/**/*"
   ],
-  "extraResources": [
-    {
-      "from": "examples",
-      "to": "examples",
-      "filter": ["*.pdf"]
-    }
-  ],
+
   "mac": {
     "category": "public.app-category.productivity",
     "target": [
@@ -65,7 +52,5 @@
     "icon": "build/icons",
     "category": "Office"
   },
-
-  "publish": null,
-  "buildVersion": "1.0.0"
+  "publish": null
 }
