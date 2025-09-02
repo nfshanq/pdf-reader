@@ -240,6 +240,56 @@ body {
   opacity: 0.7;
 }
 
+/* Electron环境的文件选择器 */
+.electron-file-selector {
+  background: white;
+  border: 2px dashed #e1e7f0;
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.electron-file-selector:hover {
+  border-color: #667eea;
+  background-color: #f8faff;
+}
+
+.electron-file-selector.loading {
+  border-color: #4CAF50;
+  background-color: #f1f8e9;
+}
+
+.select-file-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin: 1rem 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.select-file-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.select-file-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.select-file-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .upload-icon {
   font-size: 4rem;
   margin-bottom: 1rem;

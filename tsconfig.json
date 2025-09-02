@@ -19,7 +19,9 @@
       "@/*": ["src/*"],
       "@server/*": ["src/server/*"],
       "@client/*": ["src/client/*"],
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["src/shared/*"],
+      "@main/*": ["src/main/*"],
+      "@preload/*": ["src/preload/*"]
     }
   },
   "include": ["src", "test"],

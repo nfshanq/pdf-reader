@@ -4,6 +4,7 @@ import { resolve } from "path";
 
 export default defineConfig({
   plugins: [react()],
+  base: "./", // 使用相对路径，确保Electron能正确加载资源
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),

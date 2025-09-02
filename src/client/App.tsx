@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { ParameterPanel } from './components/ParameterPanel';
 import { PreviewPane } from './components/PreviewPane';
@@ -8,6 +8,9 @@ import { PDFDocument, RenderOptions, ProcessingParams, PreviewImages } from '@sh
 
 export default function App() {
   const [currentPDF, setCurrentPDF] = useState<PDFDocument | null>(null);
+  const [pendingPDF, setPendingPDF] = useState<PDFDocument | null>(null); // 保存待验证密码的文档
+  const currentPDFRef = useRef<PDFDocument | null>(null);
+  const pendingPDFRef = useRef<PDFDocument | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -47,6 +50,15 @@ export default function App() {
 
   // 简化的内存管理 - 使用useMemo缓存URL
   const previewUrls = useMemo(() => new Set<string>(), []);
+  
+  // 同步ref值
+  useEffect(() => {
+    currentPDFRef.current = currentPDF;
+  }, [currentPDF]);
+  
+  useEffect(() => {
+    pendingPDFRef.current = pendingPDF;
+  }, [pendingPDF]);
 
   // 组件卸载时清理资源
   useEffect(() => {
@@ -55,71 +67,115 @@ export default function App() {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
       previewUrls.clear();
       
-      // 关闭文档
-      if (currentPDF) {
-        apiClient.closeDocument(currentPDF.id).catch(console.error);
+      // 关闭文档（使用ref来获取最新值）
+      if (currentPDFRef.current) {
+        apiClient.closeDocument(currentPDFRef.current.id).catch(console.error);
+      }
+      // 清理待验证的文档
+      if (pendingPDFRef.current) {
+        apiClient.closeDocument(pendingPDFRef.current.id).catch(console.error);
       }
     };
-  }, [currentPDF, previewUrls]);
+  }, [previewUrls]);
 
-  const handleFileUpload = useCallback(async (file: File, password?: string) => {
+  // 清除待验证的文档
+  const clearPendingDocument = useCallback(() => {
+    const docToClose = pendingPDFRef.current || pendingPDF;
+    if (docToClose) {
+      apiClient.closeDocument(docToClose.id).catch(console.error);
+      setPendingPDF(null);
+      pendingPDFRef.current = null;
+    }
+  }, [pendingPDF]);
+
+  const handleFileUpload = useCallback(async (file?: File | 'pending', password?: string) => {
+
     setIsLoading(true);
     setError(null);
     
-    // 清理之前的预览
-    Object.values(previewImages).forEach(url => {
-      if (url) {
-        URL.revokeObjectURL(url);
-        previewUrls.delete(url);
-      }
-    });
-    setPreviewImages({});
-    
     try {
-      // 上传文件
-      const pdfDoc = await apiClient.uploadPDF(file);
-      
-      if (pdfDoc.needsPassword && !password) {
-        // 需要密码但没有提供 - 抛出特定错误让 FileUpload 组件处理
-        throw new Error('Password required');
-      }
+      const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
+      let pdfDoc: PDFDocument;
 
-      if (pdfDoc.needsPassword && password) {
-        // 验证密码
-        const authResult = await apiClient.verifyPassword(pdfDoc.id, password);
-        if (!authResult.authenticated) {
-          // 密码错误 - 抛出特定错误让 FileUpload 组件处理
-          throw new Error('Invalid password');
+      // 如果传入 'pending' 则必须验证密码，或者有待验证的文档且提供了密码
+      const currentPendingPDF = pendingPDFRef.current || pendingPDF; // 优先使用ref，避免异步问题
+      if (file === 'pending' || (currentPendingPDF && password)) {
+        if (!currentPendingPDF) {
+          throw new Error('No document pending password verification');
         }
+        if (!password) {
+          throw new Error('Password required for verification');
+        }
+        try {
+          const authResult = await apiClient.verifyPassword(currentPendingPDF.id, password);
+          
+          if (!authResult.authenticated) {
+            throw new Error('Invalid password');
+          }
+          
+          // 使用已加载的文档，更新认证状态
+          pdfDoc = { ...currentPendingPDF } as PDFDocument;
+          if (authResult.document) {
+            Object.assign(pdfDoc, authResult.document);
+          } else {
+            pdfDoc.pages = authResult.pages || [];
+            pdfDoc.isAuthenticated = true;
+          }
+          
+          // 清除待验证的文档（同时清除state和ref）
+          setPendingPDF(null);
+          pendingPDFRef.current = null;
+        } catch (error) {
+          throw error;
+        }
+      } else {
+        // 新文件上传流程
+        if (pendingPDF && !password) {
+          // 如果有待验证文档但没有密码，抛出错误
+          throw new Error('Password required');
+        }
+
+        // 清理之前的预览
+        Object.values(previewImages).forEach(url => {
+          if (url) {
+            URL.revokeObjectURL(url);
+            previewUrls.delete(url);
+          }
+        });
+        setPreviewImages({});
+
+        // 上传新文件
+        pdfDoc = isElectron ? await apiClient.uploadPDF() : await apiClient.uploadPDF(file!);
         
-        // 使用服务器返回的更新后文档信息
-        if (authResult.document) {
-          Object.assign(pdfDoc, authResult.document);
-          console.log('使用更新后的文档信息:', {
-            pageCount: pdfDoc.pageCount,
-            pagesLength: pdfDoc.pages.length,
-            isAuthenticated: pdfDoc.isAuthenticated
-          });
-        } else {
-          // 后备方案：手动更新
-          pdfDoc.pages = authResult.pages || [];
-          pdfDoc.isAuthenticated = true;
+        if (pdfDoc.needsPassword && !password) {
+          // 保存待验证的文档（同时更新state和ref）
+          setPendingPDF(pdfDoc);
+          pendingPDFRef.current = pdfDoc;  // 立即更新ref，避免异步问题
+          throw new Error('Password required');
+        }
+
+        if (pdfDoc.needsPassword && password) {
+          // 验证密码
+          const authResult = await apiClient.verifyPassword(pdfDoc.id, password);
+          if (!authResult.authenticated) {
+            // 密码错误，保存文档等待重新验证
+            setPendingPDF(pdfDoc);
+            pendingPDFRef.current = pdfDoc;
+            throw new Error('Invalid password');
+          }
+          
+          // 使用服务器返回的更新后文档信息
+          if (authResult.document) {
+            Object.assign(pdfDoc, authResult.document);
+          } else {
+            pdfDoc.pages = authResult.pages || [];
+            pdfDoc.isAuthenticated = true;
+          }
         }
       }
-
-      // 调试信息
-      console.log('PDF文档信息:', {
-        filename: pdfDoc.filename,
-        pageCount: pdfDoc.pageCount,
-        needsPassword: pdfDoc.needsPassword,
-        isAuthenticated: pdfDoc.isAuthenticated,
-        pagesLength: pdfDoc.pages?.length || 0,
-        pages: pdfDoc.pages
-      });
 
       // 安全检查：如果页面数为0但有页面边界信息，修正页面数
       if (pdfDoc.pageCount === 0 && pdfDoc.pages && pdfDoc.pages.length > 0) {
-        console.warn(`页面数为0但有${pdfDoc.pages.length}个页面边界，修正页面数`);
         pdfDoc.pageCount = pdfDoc.pages.length;
       }
 
@@ -140,8 +196,6 @@ export default function App() {
       setIsLoading(false);  // 成功完成时重置加载状态
 
     } catch (error) {
-      console.error('Upload failed:', error);
-      
       // 如果是密码相关错误，重新抛出让 FileUpload 组件处理
       if (error instanceof Error && (
         error.message.includes('Password required') || 
@@ -224,7 +278,6 @@ export default function App() {
     
     if (newCount >= 10) {
       setCcccDisabled(true);
-      console.log('彩蛋功能已禁用');
     }
   }, [ccccClickCount, ccccDisabled]);
 
@@ -257,7 +310,6 @@ export default function App() {
       // 彩蛋功能检查：如果需要重置参数
       let finalExportOptions = { ...exportOptions };
       if (shouldResetForExport()) {
-        console.log('触发彩蛋功能：重置为默认参数');
         finalExportOptions.processingParams = {
           grayscale: false,
           contrast: 1.0,
@@ -284,12 +336,18 @@ export default function App() {
         ccccDisabled // 传递彩蛋功能禁用状态
       );
 
-      // 下载文件
-      const originalName = currentPDF.filename;
-      const baseName = originalName.replace(/\.pdf$/i, '');
-      const filename = `${baseName}_processed.pdf`;
+      // 检测是否在Electron环境中
+      const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
       
-      apiClient.downloadBlob(blob, filename);
+      if (!isElectron) {
+        // 只在Web环境中才调用downloadBlob，因为Electron环境中exportPDF已经处理了文件保存
+        const originalName = currentPDF.filename;
+        const baseName = originalName.replace(/\.pdf$/i, '');
+        const filename = `${baseName}_processed.pdf`;
+        
+        apiClient.downloadBlob(blob, filename);
+      }
+      
       setShowExportDialog(false);
 
     } catch (error) {
@@ -350,11 +408,13 @@ export default function App() {
       <main className="app-main">
         {!currentPDF ? (
           <div className="upload-section">
-            <FileUpload
-              onFileUpload={handleFileUpload}
-              isLoading={isLoading}
-              error={error}
-            />
+                    <FileUpload 
+          onFileUpload={handleFileUpload}
+          isLoading={isLoading}
+          error={error}
+          hasPendingDocument={!!pendingPDF}
+          onClearPendingDocument={clearPendingDocument}
+        />
           </div>
         ) : (
           <div className="workspace">

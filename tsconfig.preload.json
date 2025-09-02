@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": false,
+    "sourceMap": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@server/*": ["src/server/*"],
+      "@client/*": ["src/client/*"],
+      "@shared/*": ["src/shared/*"],
+      "@main/*": ["src/main/*"],
+      "@preload/*": ["src/preload/*"]
+    }
+  },
+  "include": [
+    "src/preload/**/*",
+    "src/shared/**/*"
+  ],
+  "exclude": [
+    "src/main/**/*",
+    "src/server/**/*",
+    "src/client/**/*",
+    "node_modules",
+    "dist",
+    "test"
+  ]
+}
