@@ -1,0 +1,54 @@
+---
+alwaysApply: true
+description: General rules based on the project overview: strictly preserve PDF page sizes; standardize render/process/export flow; standardized use of MCP tools (Context7/Serena/Time/Cloudflare Docs).
+---
+
+## Project Rules (PDF Render → Process → Export)
+
+Reference: [project-overview.md](mdc:dev-notes/project-overview.md)
+
+### Core Invariants (Must Adhere)
+
+- Always strictly preserve the original physical page size in points (pt, 1 pt = 1/72 inch).
+- Only change pixel density via DPI during the "render to bitmap" stage; never change page size during "export PDF".
+- All content written into the codebase must be in English.
+
+### Dimensions/DPI/Export Essentials
+
+- Page bounds: `[x0, y0, x1, y1] = page.getBounds()` → `w_pt = x1 - x0`, `h_pt = y1 - y0`.
+- Scale: `s = dpi / 72`; pixel size: `w_px = floor(w_pt * s)`, `h_px = floor(h_pt * s)`.
+- Rendering (MuPDF.js): `page.toPixmap(Matrix.scale(dpi/72, dpi/72), ColorSpace.DeviceRGB, false, true).asPNG()`.
+- Export (pdf-lib): `addPage([w_pt, h_pt])`, then `drawImage(img, { x: 0, y: 0, width: w_pt, height: h_pt })` to cover the full page with no further page scaling.
+
+### Preferred Libraries & Key APIs
+
+- MuPDF.js: `PDFDocument.openDocument`, `needsPassword`/`authenticatePassword`, `loadPage`, `toPixmap(...).asPNG()`, `toStructuredText()`.
+- sharp: `greyscale()`, `threshold()`, `sharpen()`, `linear()`, `gamma()`, use `raw` pipeline when necessary.
+- pdf-lib: `PDFDocument.create()`, `addPage([w_pt, h_pt])`, `embedPng`/`embedJpg`, `drawImage`, `save()`.
+
+### Architecture Layers (Two Phases)
+
+- Phase 1 (Web prototype): Node exposes open/render/process/export APIs; Vite+React handles file/password input, parameter panel, dual-column preview, and export.
+- Phase 2 (Electron): Reuse core modules in main process/Worker, expose controlled APIs via Preload; support offline/batch/queue.
+
+### MCP Tool Usage Guidelines (Important)
+
+- Documentation retrieval (Context7):
+  - Use MCP Context7 for library docs; first resolve (locate library) then get docs (focus by topic).
+  - If Cloudflare products/platform are involved, prefer the dedicated Cloudflare Docs MCP search.
+- Code retrieval (Serena):
+  - Use MCP Serena for code understanding and navigation: start with symbols overview, then locate definitions and references, combined with pattern search; top-down, broad-to-narrow.
+  - Avoid vague queries; prefer parallelizing independent searches to improve efficiency.
+- Exact time (Time MCP Server):
+  - When current time or timezone conversion is needed, use Time MCP Server to get/convert; do not hardcode.
+
+### Performance/Quality Strategy
+
+- Choose DPI between 72–300 to balance clarity and size; prefer PNG (lossless) for text/line art; use JPEG for scanned images with appropriate `quality`.
+- Use a pipeline: render → process → preview/export; for large/multi-page files use batches or queues with controlled concurrency.
+- Perform pixel processing in Node where possible to reduce platform differences; mind MuPDF.js licensing (AGPL/commercial).
+
+### Directory Hints (Discovery & Reuse)
+
+- Web prototype (recommended): `src/server/pdf.ts`, `src/server/image.ts`, `src/server/export.ts`, and UI under `src/client/`.
+- Electron (recommended): `src/main/`, `src/preload/`, `src/renderer/`; heavy tasks can be in Workers/subprocesses.

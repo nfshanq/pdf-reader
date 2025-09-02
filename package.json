@@ -1,0 +1,47 @@
+{
+  "name": "pdf-reader",
+  "version": "1.0.0",
+  "description": "PDF image processing tool with rendering, image enhancement, and export capabilities",
+  "main": "dist/server/api.js",
+  "type": "commonjs",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "test"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "server": "nodemon --exec ts-node src/server/api.ts",
+    "server:prod": "node dist/server/api.js",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "lint": "echo 'Linting not configured yet'",
+    "test": "echo 'Tests not configured yet'"
+  },
+  "keywords": ["pdf", "image-processing", "sharp", "mupdf", "document-processing"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "mupdf": "^1.26.4",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "sharp": "^0.34.3",
+    "vite": "^7.1.4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
