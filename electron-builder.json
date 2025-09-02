@@ -4,7 +4,7 @@
   "copyright": "Copyright © 2024",
   "directories": {
     "buildResources": "build",
-    "output": "release"
+    "output": "dist-electron"
   },
   "files": [
     "dist/**/*",

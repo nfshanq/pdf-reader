@@ -25,6 +25,7 @@
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "build:electron": "npm run build && npm run build:main && npm run build:preload",
     "start:electron": "npm run build:electron && NODE_ENV=production electron .",
+    "electron:build": "npm run build:electron && electron-builder",
     "dist": "npm run build:electron && electron-builder",
     "dist:mac": "npm run build:electron && electron-builder --mac",
     "dist:win": "npm run build:electron && electron-builder --win",
