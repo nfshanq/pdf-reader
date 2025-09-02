@@ -51,7 +51,7 @@ The GitHub Actions workflow automatically builds the app when:
 ## Local Building
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 22+ (required for Vite 7.x compatibility)
 - npm 9+
 - Native dependencies will be installed automatically
 
